@@ -1,0 +1,327 @@
+/**************************************************
+  * FILE NAME: User.java
+  * WHO: Jenny Wang and Lily Xie
+  * WHEN: May 18, 2014
+  * 
+  * WHAT: User 
+  * 
+  * 
+  ***********************************************/
+
+import java.util.*;
+import java.io.*;
+
+public class User {
+  
+  private String name; //user's name
+  public PriorityQueue<Recipe> recipeBox; //contains recipes read from file
+  public LinkedList<String> contents; //contents of fridge
+  
+  /*
+   * Constructor creates the user and initializes a recipeBox 
+   * by reading from a given file. It also initalizes the contents
+   * of the user's fridge as empty (to be filled in later with
+   * addContent or removeContent).
+   * 
+   * @param String name is the user's name
+   * @param String recipeFileName is the filename of the .txt
+   * document containing the recipes
+   * 
+   * NB: eventually, we should create another constructor that
+   * only takes in one @param name and reads from a default
+   * recipe file. However, since our recipe file is still in the works,
+   * I have commented out that code below
+   */
+  public User(String name, String recipeFileName) {
+    this.name = name;
+    
+    recipeBox = new PriorityQueue<Recipe>(); //initialize as empty
+    
+    readRecipes(recipeFileName); //can cause errors that should be caught in method
+    
+    contents = new LinkedList<String>(); //initializes as empty
+  }
+  
+//  public User (String name) {
+//   this (name, /*"Recipes_updated0509.txt"*/);
+//  }
+  
+  
+  /*
+   * Can use this whether or not we decide to allow
+   * the user to input their own list of recipes
+   * 
+   * Reads first line as recipe name
+   * Loops through lines to read in as ingredients
+   * (strings) until the delimiter "#" is reached
+   * 
+   * Performs try/catch as to not freak out
+   * the program...
+   * 
+   * 5/9/14: changed format of recipes.txt
+   * New format is 
+   * Recipe name
+   * . //delimiter for ingredients
+   * Ingredient
+   * . //etc...
+   * Last ingredient
+   * # //delimiter for recipes
+   * 
+   * The added delimiter for ingredients lets
+   * us non-destructively run through the .txt
+   * file while testing for "#", the recipe
+   * delimiter. Without the delimiter ".",
+   * the scanner only reads every other ingredient
+   * since it is checking for "#" each time.
+   * 
+   * KNOWN BUG: try/catch still not specific enough
+   * 
+   */
+  private void readRecipes(String fileName) {
+    try {
+      
+      Scanner reader = new Scanner(new File(fileName));
+      
+      //populate recipeBox
+      while (reader.hasNextLine()) { //while still more lines to read
+        
+        //create single recipe
+        String recipeName = reader.nextLine();
+        //System.out.println("RECIPE NAME: " + recipeName);
+        Recipe r = new Recipe(recipeName);
+        
+        while (!reader.nextLine().equals("#")) {
+          //read in ingredients
+          String ingredient = reader.nextLine();
+          //System.out.println("ADDING: " + ingredient);
+          r.addIngredient(ingredient);
+        }
+        recipeBox.add(r);
+        //System.out.println("JUST ADDED RECIPE: " + r); 
+      }
+      reader.close();
+      
+      //I'm sure there are more specific exceptions to catch re: i/o
+    }catch (FileNotFoundException e) {
+      System.out.println("Inputed recipe file not found"); 
+    } catch (Exception e) {
+      System.out.println(e); 
+    }
+  }
+  
+  
+  /*
+   * In GUI, in 'check all the ingredients' panel, 
+   * we would use this method to add each item the
+   * user checks off
+   * 
+   * Adds a content to the contents linkedList, given the
+   * ingredient does not already exist in the list
+   * 
+   * @param String ingredient is the ingredient to be added
+   */
+  public void addContent(String ingredient) {
+    if (!contents.contains(ingredient)) contents.add(ingredient);
+  }
+  
+  /*
+   * removes an ingredient from contents, given the ingredient
+   * exists in the list
+   * 
+   * @param String ingredient is the ingredient to be removed
+   */
+  public void removeContent(String ingredient) {
+    if (contents.contains(ingredient)) contents.remove(ingredient);
+  }
+  
+  /*
+   * calculateScores calculates the scores of the recipes
+   * in recipeBox based on the user's fridge's contents. 
+   * It uses two nested loops in order to 
+   * 1) visit every recipe in recipeBox
+   * 2) loop through the contents and increment the score of
+   * the recipe if the particular content is available
+   * 
+   * This method will be called in the GUI after the user
+   * has inputed their fridge's contents (i.e pressing
+   * the "GO!" button)
+   */
+  public void calculateScores() {
+    //creates temporary recipeBox in order to correctly cycle through priority queue
+    PriorityQueue<Recipe> newRecipes = new PriorityQueue<Recipe>();
+    
+    while (!recipeBox.isEmpty()) { //outer for loop visits each element in recipeBox
+      Recipe r = recipeBox.remove(); //pops each element in recipeBox
+      
+      for (int j = 0; j < contents.size(); j++) { //inner for loop tests recipe for each ingredient
+        String ingredient = contents.get(j); //gets each ingredient
+        if (r.contains(ingredient)) 
+          r.incrementScore(); //and increments score if r contains it
+      }
+      
+      System.out.println(r.getName() + "'s score is now " + r.getScore());
+      newRecipes.add(r); //adds recipe to temporary recipeBox
+    }
+    
+    recipeBox = newRecipes;
+  }
+  
+  /*
+   * returns a string representation of the
+   * top @param x most appropriate recipes (aka
+   * recipes with 3 highest scores
+   * 
+   * @param int x is the number of top recipes to be returned (not necessary)
+   * 
+   * NB: x must be > 0 and < recipeBox.size
+   */
+  public String[] topRecipes() {
+    String[] s = new String[3];  
+    
+    //first, create temp queue in order to nondestructively traverse recipeBox
+    PriorityQueue<Recipe> temp = new PriorityQueue<Recipe>(); 
+    
+    //add top 3 recipes to string as well as temp queue
+    for (int i = 0; i < 3; i++) {
+      //we will probably have to edit this to suit the GUI!
+      Recipe r = recipeBox.remove();
+      s[i] = r.getName();
+      temp.add(r);
+    }
+    
+    //add remainder of recipes back into queue
+    while (!recipeBox.isEmpty()) {
+      temp.add(recipeBox.remove());
+    }
+    
+    recipeBox = temp;
+    return s;
+  }
+
+  
+  public String[] getRecipeNames() {
+    String[] names = new String[recipeBox.size()];
+    PriorityQueue<Recipe> newRecipes = new PriorityQueue<Recipe>();
+    
+    System.out.println(recipeBox);
+    
+    int i = 0;
+    while (!recipeBox.isEmpty()) {
+//    for (int i = 0; i < recipeBox.size(); i++) {
+      Recipe r = recipeBox.remove(); //pops each element in recipeBox
+      System.out.println("r is: " + r);
+      names[i] = r.getName();
+      System.out.println("name is: " + r.getName());
+      newRecipes.add(r); //adds recipe to temporary recipeBox
+      i++;
+    }
+    
+    recipeBox = newRecipes;
+    return names;
+  }
+  
+  //think this should be array....
+  public String getHave(Recipe selected) {
+    String result = "";
+    for(int i = 0; i < contents.size(); i++) {
+      if(selected.contains(contents.get(i))) {
+        result+= " " + contents.get(i);
+      }
+    }
+    return result;
+  }
+  
+  public String getNeed(Recipe selected) {
+    String result = "";
+    LinkedList<String> selectedIngredients = selected.getIngredients();
+    while (!selectedIngredients.isEmpty()) {
+      String i = selectedIngredients.remove();
+      if (!contents.contains(i)) result += " " + i;
+    }
+    return result;
+  }
+  
+  
+  // show the recipe list for the specific recipe name given
+  public Recipe findInList(String name) {
+    PriorityQueue<Recipe> newRecipes = new PriorityQueue<Recipe>();
+    
+    Recipe returnRecipe = new Recipe("Recipe does not exist");
+    
+    while (!recipeBox.isEmpty()) { //outer for loop visits each element in recipeBox
+      Recipe r = recipeBox.remove(); //pops each element in recipeBox
+      
+      if (r.getName().equals(name)) returnRecipe = r;
+      
+//      System.out.println(r.getName() + "'s score is now " + r.getScore());
+      newRecipes.add(r); //adds recipe to temporary recipeBox
+    }
+    
+    recipeBox = newRecipes;
+    return returnRecipe;
+    
+  }
+  
+  
+
+  
+  public String getRecipes() {
+   return recipeBox.toString(); 
+  }
+  
+  //toString
+  
+  
+  public static void main(String[] args) {
+    
+    User driver = new User("hi", "recipes0516.txt");
+    driver.getRecipeNames();
+    System.out.println(driver.recipeBox);
+
+//    System.out.println(driver.findInList("PBnJ"));
+//    System.out.println(driver.findInList("Omelette"));
+    //testing constructor
+    //System.out.println("Testing constructor");
+    //System.out.print("Expected: error\tActual: ");
+    //User errorTest = new User("ERRORTEST", "nonexistent.txt");
+//    User test = new User("TEST", "recipes0516.txt");
+//    System.out.println("queue of recipes" + test.recipeBox);
+    //System.out.println("finding Omelette  " + test.findInList("Ham Sandwich"));
+//    System.out.println("finding PBnJ  " + test.findInList("PBnJ"));
+    // User emptyTest = new User("TEST", "EmptyRecipes.txt");
+    
+    //testing addContent and removeContent
+//    System.out.println("\nTesting addContent and removeContent");
+//    System.out.println("Adding Peppers, Bacon, Bacon, Mayo, Chips, w@Cky, remove");
+//    test.addContent("Peppers");
+//    test.addContent("Bacon");
+//    test.addContent("Bacon"); //testing duplicates
+//    test.addContent("Mayo");
+//    test.addContent("Chips");
+//    test.addContent("w@Cky"); //testing weird shit
+//    test.addContent("remove");
+//    System.out.println("Removing remove");
+//    test.removeContent("remove");
+//    System.out.println("Removing nonexistent");
+//    test.removeContent("nonexistent");
+//    System.out.println("Expected: [Peppers, Bacon, Mayo, Chips, w@Cky]\tActual: " + test.contents);
+//    //do we need a printContents method??? i don't think so
+//    
+//    //testing calculateScores
+//    System.out.println("\nTesting calculateScores");
+//    test.calculateScores();
+//    emptyTest.calculateScores();
+//    System.out.println("Expected: BLT, Omelette, Caesar Salad,...\tActual: " + test.recipeBox);
+//    System.out.println("first recipe: " + test.firstRecipe());
+//     System.out.println("second recipe: " + test.secondRecipe());
+//      System.out.println("third recipe: " + test.thirdRecipe());
+//    
+//    //testing topRecipes
+//    System.out.println("\nTesting topRecipes");
+//    System.out.println("Expected: BLT, Omelette, Caesar Salad\tActual: " + test.topRecipes(3));
+//    System.out.println("Expected: empty\tActual: " + test.topRecipes(0));
+//    System.out.println("Expected: error\tActual: " + test.topRecipes(-100));
+//    System.out.println("Expected: error\tActual: " + test.topRecipes(100));
+  }
+  
+}
